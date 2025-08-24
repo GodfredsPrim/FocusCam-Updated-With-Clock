@@ -1,69 +1,68 @@
-# FocusCam-Updated-With-Clock
-# 🎥 FocusCam – AI-Powered Focus Tracker
+# USSD Voting App (FastAPI + SQLite)
 
-**FocusCam** is an intelligent productivity tool built with Python and OpenCV that helps students and remote workers stay focused using AI face detection. It tracks whether you're focused or distracted via your webcam and keeps logs, streaks, snapshots, and even motivational quotes.
+Backend for a USSD-based voting flow with mock MTN MoMo payment. Users must pay before their vote is recorded. Results are available via an admin endpoint.
 
----
+## Stack
+- FastAPI
+- SQLite (SQLAlchemy)
+- Pluggable payment provider (mock included)
 
-## ✨ Features
+## Setup
 
-- 📸 Face tracking (focus vs. distracted)
-- 📆 Daily goals and productivity streaks
-- 🌓 Dark mode and night mode support
-- 🗣️ Audio feedback
-- 🖼️ Snapshot capture
-- 📝 Quote editor
-- 📄 Export daily reports as PDF
-- 🎯 Gamified dashboard
-
----
-
-## 🚀 How to Run
-
-1. Install Python 3.8+  
-2. Clone the repository or download the ZIP  
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Run the app:
-   ```bash
-   python app.py
-   ```
-
----
-
-## 📂 Project Structure
-
-```
-FocusCam/
-├── app.py
-├── requirements.txt
-├── README.md
-├── quotes.csv
-└── assets/
-    └── (logo, icons, backgrounds if any)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r /workspace/requirements.txt
 ```
 
----
+## Run
 
-## 📸 Screenshot
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-> *(Add a screenshot or GIF of your app here when available)*
+- Health check: `GET /healthz`
+- USSD: `POST /ussd` (content-type: `application/x-www-form-urlencoded` or JSON)
+- Admin results JSON: `GET /admin/results`
+- Admin HTML dashboard: `GET /admin`
 
----
+## USSD Payload Examples
 
-## 👤 Author
+Form or JSON keys typical of gateways:
+- `sessionId`: unique session identifier
+- `phoneNumber`: MSISDN (e.g., 2567XXXXXXX)
+- `text`: cumulative user input (e.g., `1*1`); last token is used per step
 
-**Godfred Bio**  
-Computer Science Student – University of Cape Coast  
-📍 Cape Coast, Ghana  
-📧 godfredbio2004@gmail.com  
-🔗 [LinkedIn](https://gh.linkedin.com/in/godfred-bio-0707052bb)
+Example using JSON:
 
----
+```bash
+curl -s -X POST http://localhost:8000/ussd \
+  -H 'Content-Type: application/json' \
+  -d '{"sessionId":"abc123","phoneNumber":"256700000001","text":""}'
+```
 
-## 🌟 Support
+Follow-up step (select candidate A and confirm):
 
-If you find this project useful, feel free to give it a ⭐ on GitHub or share it with others!
+```bash
+# Step 1: show menu
+curl -s -X POST http://localhost:8000/ussd \
+  -H 'Content-Type: application/json' \
+  -d '{"sessionId":"abc123","phoneNumber":"256700000001","text":""}'
+
+# Step 2: choose 1 (A)
+curl -s -X POST http://localhost:8000/ussd \
+  -H 'Content-Type: application/json' \
+  -d '{"sessionId":"abc123","phoneNumber":"256700000001","text":"1"}'
+
+# Step 3: confirm payment (1)
+curl -s -X POST http://localhost:8000/ussd \
+  -H 'Content-Type: application/json' \
+  -d '{"sessionId":"abc123","phoneNumber":"256700000001","text":"1*1"}'
+```
+
+The mock provider confirms immediately and records the vote. Duplicate votes by the same phone are prevented.
+
+## Swapping to Real MTN MoMo Later
+- Implement a new provider class extending `app/payment/base.py:PaymentProvider`
+- Wire it in `app/routers/ussd.py` where the mock is used
+- Optionally add a payment callback endpoint to update `Payment` status and record the vote on confirmation
